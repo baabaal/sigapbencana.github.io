@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>SIGAP BENCANA — Portal Belajar PAUD Siaga Bencana</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,700&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          cream: '#FFFBF2',
+          paper: '#FFF6E9',
+          ink: '#2B3A4A',
+          inkfaint: '#6B7C8C',
+          sky: { light:'#DCF3FF', DEFAULT:'#4FB6E8', dark:'#2E93C4', ink:'#0F3F53' },
+          leaf: { light:'#E3F5DD', DEFAULT:'#6BBF59', dark:'#4C9A3C', ink:'#1F3B15' },
+          sun:  { light:'#FFF3D1', DEFAULT:'#FFC93C', dark:'#E8A800', ink:'#4A3200' },
+          coral:{ light:'#FFE2D9', DEFAULT:'#FF7A5C', dark:'#E85A3B', ink:'#4A1B0E' },
+        },
+        fontFamily: {
+          heading: ['"Baloo 2"','sans-serif'],
+          body: ['Nunito','sans-serif'],
+        },
+        /* Ditambahkan agar kelas font-700/font-800 yang dipakai
+           di seluruh halaman benar-benar menghasilkan CSS
+           (skala fontWeight bawaan Tailwind hanya mengenal nama
+           seperti font-bold/font-extrabold, bukan angka). */
+        fontWeight: { '700':'700', '800':'800' },
+        borderRadius: { '4xl':'2rem', '5xl':'2.75rem' },
+      }
+    }
+  }
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { font-family:'Nunito',sans-serif; background:#FFFBF2; color:#2B3A4A; }
+  h1,h2,h3,h4,.font-heading { font-family:'Baloo 2',sans-serif; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
+  }
+  ::-webkit-scrollbar{ width:10px; height:10px;}
+  ::-webkit-scrollbar-thumb{ background:#c9d8de; border-radius:8px;}
+  .bob { animation: bob 3.6s ease-in-out infinite; }
+  @keyframes bob { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-10px) } }
+  .drift { animation: drift 14s linear infinite; }
+  @keyframes drift { 0%{ transform:translateX(0)} 50%{ transform:translateX(24px)} 100%{ transform:translateX(0)} }
+  .pulse-ring { animation: pulsering 2.2s ease-out infinite; }
+  @keyframes pulsering { 0%{ box-shadow:0 0 0 0 rgba(255,201,60,.55)} 100%{ box-shadow:0 0 0 22px rgba(255,201,60,0)} }
+  .fade-up { animation: fadeup .5s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes fadeup { from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:translateY(0)} }
+  .pop { animation: pop .35s cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes pop { from{opacity:0; transform:scale(.85)} to{opacity:1; transform:scale(1)} }
+  .twinkle { animation: twinkle 2.4s ease-in-out infinite; }
+  @keyframes twinkle { 0%,100%{ opacity:.35; transform:scale(.85) } 50%{ opacity:1; transform:scale(1.1) } }
+  @keyframes wiggle { 0%,100%{ transform:rotate(0deg) } 25%{ transform:rotate(-8deg) } 75%{ transform:rotate(8deg) } }
+  .group:hover .wiggle-hover { animation: wiggle .5s ease-in-out 2; }
+  .squiggle path { stroke-dasharray: 340; stroke-dashoffset: 340; animation: draw 1.1s ease-out .3s forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0 } }
+  .path-line { stroke-dasharray: 10 10; }
+  input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid #2E93C4; outline-offset: 2px; }
+  .scrollbar-none::-webkit-scrollbar{display:none;}
+  .scrollbar-none{ -ms-overflow-style:none; scrollbar-width:none; }
+</style>
+</head>
+<body class="antialiased">
+
+<div id="app"></div>
+
+<template id="tpl-download-modal">
+  <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6" data-modal-root>
+    <div class="absolute inset-0 bg-ink/50 backdrop-blur-sm" data-modal-backdrop></div>
+    <div class="relative w-full sm:max-w-md bg-white rounded-t-4xl sm:rounded-4xl p-6 sm:p-8 pop shadow-2xl" data-modal-panel></div>
+  </div>
+</template>
+
+<script>
+/* =========================================================
+   DATA — Materi Kebencanaan PAUD
+   ========================================================= */
+const SYN_LABELS = [
+  {key:'risk', id:'Mengenali Risiko', en:'Risk Recognition'},
+  {key:'safe', id:'Menentukan Tempat Aman', en:'Determining Safe Places'},
+  {key:'mit',  id:'Mengurangi Risiko', en:'Risk Reduction'},
+  {key:'resp', id:'Menentukan Respon', en:'Determining Response'},
+  {key:'rec',  id:'Recovery', en:'Recovery'},
+];
+
+/* =========================================================
+   CARA MENGHUBUNGKAN BERKAS DARI GOOGLE DRIVE
+   ---------------------------------------------------------
+   Singkatnya: CUKUP TEMPEL TAUTANNYA. Berkas TIDAK perlu
+   diunduh atau diletakkan di folder web. Kode di bawah akan
+   otomatis mengubah tautan berbagi Drive menjadi tautan yang
+   benar untuk dibuka atau diunduh.
+
+   LANGKAH 1 — Atur izin berkas di Google Drive
+     Klik kanan berkas > "Bagikan" > pada "Akses Umum" pilih
+     "Siapa saja yang memiliki link" > peran "Pelihat".
+     ⚠ Bila langkah ini dilewati, guru lain akan melihat
+       halaman "Anda memerlukan akses".
+
+   LANGKAH 2 — Salin tautannya
+     Klik "Salin link". Bentuknya kira-kira begini:
+     https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUv/view?usp=sharing
+
+   LANGKAH 3 — Tempel ke dalam F() sebagai isian ketiga
+     Sebelum : F('LKPD: Maze Tempat Aman','lkpd')
+     Sesudah : F('LKPD: Maze Tempat Aman','lkpd','https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUv/view?usp=sharing')
+
+   LANGKAH 4 (opsional) — Pilih perilaku tombol
+     Bawaannya, berkas TIDAK langsung terunduh — tautan dibuka
+     dulu sebagai pratinjau di tab baru (guru bisa lihat isinya,
+     lalu unduh sendiri lewat tombol unduh milik Google Drive).
+     Isian keempat bisa dipakai untuk mengubah perilaku itu:
+       'preview'  -> buka pratinjau di tab baru   (bawaan)
+       'download' -> berkas langsung terunduh
+     Contoh bila ingin langsung unduh tanpa pratinjau:
+       F('Video Animasi Banjir','video', 'https://...', 'download')
+
+   CATATAN JENIS BERKAS
+     • PDF / gambar / video / zip  -> 'preview' maupun
+       'download' keduanya berfungsi.
+     • Google Docs, Slides, Sheets -> harus pakai 'preview'.
+       Berkas jenis ini tidak bisa diunduh lewat tautan
+       langsung. Bila ingin bisa diunduh, ubah dulu menjadi
+       PDF di Drive (File > Unduh > PDF), unggah ulang
+       PDF-nya, lalu pakai tautan PDF itu.
+     • Tautan YouTube boleh ditempel apa adanya.
+     • Tautan FOLDER Drive juga boleh, otomatis dibuka di
+       tab baru.
+
+   Berkas yang belum diberi tautan tetap aman: tombolnya
+   menampilkan pesan bahwa berkas belum tersedia.
+   ========================================================= */
+
+function F(name, type, url, mode){
+  return {name, type, url: url || '', mode: mode || 'preview'};
+}
+
+/* Mengubah tautan berbagi Google Drive menjadi tautan langsung.
+   Tautan non-Drive (YouTube, situs lain) dibiarkan apa adanya. */
+function resolveURL(url, mode){
+  if(!url) return '';
+  if(!/drive\.google\.com|docs\.google\.com/.test(url)) return url;
+  if(/\/folders\//.test(url)) return url;              // folder: buka apa adanya
+  if(/docs\.google\.com/.test(url)) return url;        // Docs/Slides/Sheets: buka apa adanya
+
+  const m = url.match(/\/d\/([A-Za-z0-9_-]{10,})/) || url.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  if(!m) return url;
+  const id = m[1];
+  return mode === 'preview'
+    ? `https://drive.google.com/file/d/${id}/view`
+    : `https://drive.google.com/uc?export=download&id=${id}`;
+}
+
+const DATA = {
+  banjir: {
+    name:'Banjir', theme:'sky', emoji:'🌊',
+    tagline:'Mengenali air yang naik, dan tahu ke mana harus pergi.',
+    hero:'💧',
+    syntaxes:[
+      { tujuan:'Anak mampu mengenali kondisi penyebab dan tanda sederhana banjir.',
+        /* CONTOH pengisian tautan ada pada baris di bawah ini.
+           Ganti tautan contoh dengan tautan Drive milik Anda. */
+        materi:[F('Kartu Gambar Banjir','card','https://drive.google.com/file/d/1JkamxZszaoSAWgVwWAWMbg2re1JR4Fgd/view?usp=sharing'), F('Kartu Faktor Penyebab Banjir','card','https://drive.google.com/file/d/13rYNAjEmAULFAhHjeelSvfm8ke5XnW84/view?usp=sharing')],
+        lkpd:[F('LKPD: Menghubungkan Gambar Banjir & Faktor Penyebabnya','lkpd','https://drive.google.com/file/d/1Qc8CBzocAiHsZpL8QEwoNV4XhPrnbqVO/view?usp=drive_link'), F('LKPD: Memberi Tanda pada Kondisi Berisiko','lkpd','https://drive.google.com/file/d/15-OocnyxUfO0sqQwg-L0PmimtqRmFWgZ/view?usp=drive_link'), F('LKPD: Mewarnai Gambar Lingkungan','lkpd','https://drive.google.com/file/d/1cfBnpgAJ1YDTGHhi_etaJjzJJAGrXv7h/view?usp=drive_link')] },
+      { tujuan:'Anak mampu memilih tempat aman/titik kumpul saat banjir.',
+        materi:[F('Denah Sederhana (Lingkungan Sekolah, Sungai, Selokan, Perbukitan)','doc','https://drive.google.com/file/d/1rmoq9hAhOhgpU55Fd5S07M-_aSGc55Y5/view?usp=drive_link'), F('Tanda Evakuasi Saat Banjir','card','https://drive.google.com/file/d/1MSBBeJhRfEs8VgVUPli8ta2upCjOq5EM/view?usp=drive_link'), F('Kartu Tempat Aman/Tidak Aman untuk Banjir','card','https://drive.google.com/file/d/1_1_BjucYFXvbimSzeHE7v1Jz794He12g/view?usp=drive_link')],
+        lkpd:[F('LKPD: Maze Mencari Jejak Tempat Aman','lkpd','https://drive.google.com/file/d/1u8KbfVsxD1k9UzyoA-36i6eAGtVI3QLs/view?usp=drive_link'), F('LKPD: Mencari Perbedaan Gambar Lingkungan','lkpd','https://drive.google.com/file/d/1e9rQUaLIbFCQdPJHwM5RagdaY7l8OBFS/view?usp=drive_link'), F('LKPD: Melengkapi Huruf Menjadi Kata "Banjir"','lkpd','https://drive.google.com/file/d/1hd-POJtSjp_jkE87KNIR2yP4H-UN4Riq/view?usp=drive_link')] },
+      { tujuan:'Mengurangi risiko banjir melalui kebersihan lingkungan & tas siaga.',
+        materi:[F('Gambar Selokan Bersih vs Kotor','card','https://drive.google.com/file/d/1vfm0HPqOlQRzouuraJxgty-vLm9uWfpd/view?usp=drive_link'), F('Media Miniatur Selokan & Sampah Tiruan','doc','https://drive.google.com/file/d/1-anFtK-gopLu8v8LkxxJC-HcOLBhURSK/view?usp=drive_link'), F('Gambar Tas & Perlengkapan Siaga dan isinya','card','https://drive.google.com/file/d/1Llbe0ttgV-TMvkKyzi3CmAikr0HaExAD/view?usp=drive_link')],
+        lkpd:[F('LKPD: Mengelompokkan Tindakan Boleh/Tidak Boleh Dilakukan','lkpd','https://drive.google.com/file/d/1lJB7pDWjGK89ZyWwLRdmKIK4uT3Bt0lN/view?usp=drive_link'), F('LKPD: Gunting & Tempel Isi Tas Siaga','lkpd','https://drive.google.com/file/d/1M9jL_HRmasCVc3TU75InsdEYk11shqRE/view?usp=drive_link'), F('LKPD: Mewarnai Tas Siaga','lkpd','https://drive.google.com/file/d/1oe5LH8D8fcTXoHulE9uyAFcN4Gcf8zAm/view?usp=drive_link')] },
+      { tujuan:'Memilih respons aman dan berlatih evakuasi.',
+        materi:[F('Media Peralatan Simulasi','doc','https://drive.google.com/file/d/1DKSbyWwpOdm4rDMK2P48r0uiNBxPlsgt/view?usp=drive_link'), F('Gambar Titik Kumpul & Peluit','card','https://drive.google.com/file/d/1hdFxbZQ4AAkgNMvBK470_zsauykJBt5N/view?usp=drive_link')],
+        lkpd:[F('LKPD: Menghitung Gambar Tempat Aman & Tidak Aman','lkpd','https://drive.google.com/file/d/1yxlSIlTbg1GnFSDzG3NP0EYp5qBwcdF6/view?usp=drive_link'), F('LKPD: Menandai Arah Jalur Evakuasi','lkpd','https://drive.google.com/file/d/1AXv-oJy7lDgI1Lw0H4QMQfvRYIENHhdm/view?usp=drive_link'), F('LKPD: Peralatan Simulasi','lkpd','https://drive.google.com/file/d/1wsM5aGs4Fc01-svqsWoI5fyUkqDSxdwp/view?usp=drive_link')] },
+      { tujuan:'Tindakan pemulihan lingkungan dan menata kembali ruang aman.',
+        materi:[F('Gambar Lingkungan Sebelum & Sesudah Banjir','card','https://drive.google.com/file/d/1WmyqQN_8UIkP25q3VAC16iMh1PYYTQzB/view?usp=drive_link'), F('Media Tanaman & Wadah Menanam','doc','https://drive.google.com/file/d/15J1CPBp7pL6PBNpQRq0CikWspaZkk11n/view?usp=drive_link')],
+        lkpd:[F('LKPD: Mengenal Ekspresi Wajah (Senang, Sedih, Takut, Marah)','lkpd','https://drive.google.com/file/d/1a8EzMGd6Q0aH8KOY0_fEN_mR2SuOrf-B/view?usp=drive_link'), F('LKPD: Usap Abur Rumah Impian','lkpd','https://drive.google.com/file/d/1nKujlv5idW31PqxU5ryYUr5UgPJNUA2u/view?usp=drive_link'), F('LKPD: Menghitung Jumlah Tanaman','lkpd','https://drive.google.com/file/d/1cQLK7NrKccPyYQFsvJP5z6DNjYcQ_-RR/view?usp=drive_link')] },
+    ]
+  },
+  longsor: {
+    name:'Tanah Longsor', theme:'leaf', emoji:'⛰️',
+    tagline:'Mengenali lereng dan tanah yang bergerak, lalu menjauh dengan tenang.',
+    hero:'🌳',
+    syntaxes:[
+      { tujuan:'Mengenali lingkungan berpotensi longsor (lereng, tanah retak, hujan deras).',
+        materi:[F('Media Mewarnai Gambar Lingkungan','doc','https://drive.google.com/file/d/1L0aEJN3CnugPKi6WnZkfFmDoul-P8D2m/view?usp=drive_link'), F('Media Melingkari Perilaku Boleh/Tidak Boleh Dilakukan','doc','https://drive.google.com/file/d/1DXtGRPMvKnJd6ztIY2i9mXCKm2aLuqMv/view?usp=drive_link'), F('Media Melengkapi Huruf Menjadi Kata "Pohon"','doc','https://drive.google.com/file/d/12mLyUdHrcHyRQjlYiO1SvDCTaqF90Yqd/view?usp=drive_link')],
+        lkpd:[F('LKPD: Mewarnai Gambar Lingkungan','doc','https://drive.google.com/file/d/1wGgebokh_RDNa_VFuujl2cqP-y9jfWGl/view?usp=drive_link'), F('LKPD: Melingkari Perilaku Boleh/Tidak Boleh Dilakukan','doc','https://drive.google.com/file/d/1jSpgRQrAxzwWRdCAogyEDsRfMj4mkfk_/view?usp=drive_link'), F('LKPD: Melengkapi Huruf Menjadi Kata "Pohon"','doc','https://drive.google.com/file/d/19DXDeWZ9HsOElrAFBE3FLTAzDs-pLzFI/view?usp=drive_link')] },
+      { tujuan:'Menjauh dari lereng dan mengenali titik aman.',
+        materi:[F('Media Miniatur Lingkungan: Bermain Peran (Hutan, Gunung, Sekolah, Perkampungan)','doc','https://drive.google.com/file/d/1wcq_FEUaAgcWweCviIcboXDx6RRgda3w/view?usp=drive_link')],
+        lkpd:[F('LKPD: Menghubungkan Gambar dengan Kata','lkpd','https://drive.google.com/file/d/1uqLozCVve8cHjSgnJEH7Mv6bphitNPrZ/view?usp=drive_link'), F('LKPD: Menghitung Huruf pada Kata Rumah, Pohon, dan Sekolah','lkpd','https://drive.google.com/file/d/1TnmDmRrS5S7c7bPbeXxrPpDIb1aRX05J/view?usp=drive_link')] },
+      { tujuan:'Menanam dan merawat tanaman pelindung tanah.',
+        materi:[F('Kartu Tanaman Subur/Tidak Subur','card','https://drive.google.com/file/d/15IU7fnHfWuNkc3Sge5ZG8A7-HbGGjVT5/view?usp=drive_link'), F('Media Big Book Alat Gotong Royong','flip','https://drive.google.com/file/d/1I4tLCF1Yj-G75a_M0AT-JAUZXYuL_Uab/view?usp=drive_link')],
+        lkpd:[F('LKPD: Mewarnai Gambar Tanaman Subur/Tidak Subur','lkpd','https://drive.google.com/file/d/1Ji5MMQ0v7HO0xcDcflUwO4FpUzPThgPx/view?usp=drive_link'), F('LKPD: Menghubungkan Gambar Alat Gotong Royong dengan Kata','lkpd','https://drive.google.com/file/d/1-kfuIRFs8TGdENsKEeI5Nl0PN68Bo0O-/view?usp=drive_link')] },
+      { tujuan:'Respons aman saat melihat tanda longsor & meminta pertolongan.',
+        materi:[F('Media Boneka Simulasi Bencana Tanah Longsor','doc','https://drive.google.com/file/d/1PNMpcLNuFYOhJ5NZ5_jM7UoArfF21M5r/view?usp=drive_link'), F('Kartu Respons Tanah Longsor 1 (rujukan BNPB)','card','https://drive.google.com/file/d/1t6OCvJgqxHC3iI-juQ0B3iJapl0Z3JNj/view?usp=drive_link'), F('Kartu Respons Tanah Longsor 2 (rujukan BNPB)','card','https://drive.google.com/file/d/1-qqXoivdxWJxWfgvlF-y2YvpCXsRg3gY/view?usp=drive_link'), F('Kartu Respons Tanah Longsor 3 (rujukan BNPB)','card','https://drive.google.com/file/d/1twBVxfLrlb3n1PpawTPQsmsWMvJHhh3m/view?usp=drive_link')],
+        lkpd:[F('LKPD: Menyusun Urutan Kartu Respons','lkpd','https://drive.google.com/file/d/1Ax9CDKT_dFpG9JoZbPQB7CJR2LRmmX_S/view?usp=drive_link'), F('LKPD: Mewarnai Boneka','lkpd','https://drive.google.com/file/d/1BGeINknw8OHbQxRSefHDVcWnD-4GH3VG/view?usp=drive_link')] },
+      { tujuan:'Pemulihan lingkungan dan reboisasi sederhana.',
+        materi:[F('Gambar Mencari Perbedaan: Bukit Sebelum & Sesudah Longsor','card','https://drive.google.com/file/d/1iCSiacbyPjPOjv7FiWYCYtmwotPryySQ/view?usp=drive_link'), F('Kartu Gambar Bukit Sebelum & Sesudah Longsor','card','https://drive.google.com/file/d/1ahkGXHrbn_plohpZ_DurHAQY2UZwvv0B/view?usp=drive_link'), F('Pola Origami "Bukitku Kembali Hijau"','doc','https://drive.google.com/file/d/1c2H8Rbf8lb38uLUoJ2DT7jGG_y2Ibmh5/view?usp=drive_link')],
+        lkpd:[F('LKPD: Menghitung Jumlah Pohon di Bukit','lkpd','https://drive.google.com/file/d/1pajZ7a4pKRyyjZaPzrwnztU7RM3kdFKP/view?usp=drive_link'), F('LKPD: Kolase Origami Bukit Hijau','lkpd','https://drive.google.com/file/d/14269Tbu5hIfwXGcxx08X1l5N4AGr4R8X/view?usp=drive_link')] },
+    ]
+  },
+  cuaca: {
+    name:'Cuaca Ekstrem', theme:'sun', emoji:'🌪️',
+    tagline:'Angin kencang, badai, dan panas terik — tahu kapan harus berteduh.',
+    hero:'☁️',
+    syntaxes:[
+      { tujuan:'Mengenali tanda cuaca ekstrem (hujan lebat, angin kencang, petir).',
+        materi:[F('Kartu Cuaca: Cerah, Berawan, Hujan Lebat, Angin Kencang, Petir','card','https://drive.google.com/file/d/1iOUYqKULMesFSHMgXo5mTXjKBxOyCZZl/view?usp=drive_link')],
+        lkpd:[F('LKPD: Menghubungkan Gambar Kartu Cuaca dengan Kata','lkpd','https://drive.google.com/file/d/1NcLfOmVQiODk9BJNF9QQHV9fFmg2-i6_/view?usp=drive_link'), F('LKPD: Melingkari Gambar Cuaca Biasa & Cuaca Ekstrem','lkpd','https://drive.google.com/file/d/1SWxpxFWuWf2h86Nh5wnYFynVSlk6D0lm/view?usp=drive_link'), F('LKPD: Mewarnai Kartu Cuaca','lkpd','https://drive.google.com/file/d/147eiNZxMv-cp7h5WDjvx_FdTGvNZDnMG/view?usp=drive_link')] },
+      { tujuan:'Memilih ruangan tertutup dan aman dari pohon/tiang listrik.',
+        materi:[F('Flashcard Tempat Aman','card','https://drive.google.com/file/d/1AKk7FR_R6nVFayt7tnQajcSXXDK2Lr2r/view?usp=drive_link'), F('Media Miniatur Rumah, Sekolah & Pohon (Bermain Peran)','doc','https://drive.google.com/file/d/1FPyWN7qlM7Gq0aNheG0pN-0oIt_dAI9v/view?usp=drive_link')],
+        lkpd:[F('LKPD: Maze Tempat Aman','lkpd','https://drive.google.com/file/d/1xFJLkF9Iq4Q21Wt5W57W4Et3m2vMoNor/view?usp=drive_link'), F('LKPD: Gunting & Tempel','lkpd','https://drive.google.com/file/d/1NkcKpqXrm8jh1Uoq-IKPe_aoiSrsQNIn/view?usp=drive_link'), F('LKPD: Menghitung Benda','lkpd','https://drive.google.com/file/d/1S9lZsP1WwlI5H96elhHys65BgDJHnh2z/view?usp=drive_link')] },
+      { tujuan:'Menutup jendela, menghindari pohon besar, dan berperilaku aman.',
+        materi:[F('Gambar Situasi Aman/Tidak Aman','card','https://drive.google.com/file/d/1uq1Nga_LURTWmBmStso4kutJLQBfNduS/view?usp=drive_link'), F('Gambar Perilaku Benar & Tidak Benar','card','https://drive.google.com/file/d/1H3jd1ItsCV1sSCKLlYqz5Ps29xvJPU86/view?usp=drive_link'), F('Media Peralatan Eksperimen Benda Tertiup Angin','doc','https://drive.google.com/file/d/1snxZxHHSouWC9aS6xjz5pr8Qovxbcc_P/view?usp=drive_link')],
+        lkpd:[F('LKPD: Menghubungkan Gambar Aman/Tidak Aman dengan Kata','lkpd','https://drive.google.com/file/d/1-qgaV8zIoB8eiYutANv4zvFBIsOYTfAn/view?usp=drive_link'), F('LKPD: Mewarnai Perilaku Benar & Tidak Benar','lkpd','https://drive.google.com/file/d/1y96guUlh2AUWYhKb7cB_CTS1k640EvVg/view?usp=drive_link')] },
+      { tujuan:'Berlindung bersama orang dewasa & mengelola emosi.',
+        materi:[F('Kartu Emosi Anak','card','https://drive.google.com/file/d/1LQlN8gNzhmEb1PYzjnDgSw6fuz7RDdAR/view?usp=sharing'), F('Media Peralatan Simulasi','doc','https://drive.google.com/file/d/1AqXiojohvm_mHiLH8DyEWHAfNDVsI_Y7/view?usp=drive_link')],
+        lkpd:[F('LKPD: Mengenal Emosi','lkpd','https://drive.google.com/file/d/190KSjs4mTgGJhnk6KP6gUg2IKX1t9QYm/view?usp=drive_link'), F('LKPD: Menarik Garis Menuju Tempat Aman','lkpd','https://drive.google.com/file/d/1NjXD3iOOK6BN_qkbF4ayZlfCMr-bKB7g/view?usp=drive_link')] },
+      { tujuan:'Membersihkan ranting/daun dan gotong royong mini.',
+        materi:[F('Media Miniatur Lingkungan','doc','https://drive.google.com/file/d/1pWjAsrukK394UTSE30BGv9bW7K3s_NNf/view?usp=drive_link'),F('Media Daun & Ranting Tiruan','doc','https://drive.google.com/file/d/1zz-MNJxUvNFXTXd0z58C0vn20AS_030t/view?usp=drive_link'), F('Media Tanaman','doc','https://drive.google.com/file/d/1KvOasKyCF4UnctN5tB6sWF1cnX8LzS9J/view?usp=drive_link'), F('Media Alat Kebersihan Sederhana','card','https://drive.google.com/file/d/1axI0eGforg-iIgqAzvSPJWerD2ULxM1P/view?usp=drive_link')],
+        lkpd:[F('LKPD: Mencari Perbedaan Gambar Lingkungan','lkpd','https://drive.google.com/file/d/1Mvzq8-5e_YSWppJI8a-fh64iVKeYra8b/view?usp=drive_link'), F('LKPD: Mewarnai Gambar Lingkungan','lkpd','https://drive.google.com/file/d/1hofeyCwJwRJC4ByHKYkTBbDvKCqw1KP_/view?usp=drive_link'), F('LKPD: Mengenal Alat Kebersihan Sederhana','lkpd','https://drive.google.com/file/d/1tSnvLRA_4Zao38Hk5_Flp79cZ2seB8aB/view?usp=drive_link')] },
+    ]
+  }
+};
+
+const FILE_ICON = { flip:'📖', card:'🗂️', lkpd:'📝', video:'🎬', audio:'🎵', doc:'📄' };
+const FILE_LABEL = { flip:'Flipped Book', card:'Kartu Gambar', lkpd:'LKPD', video:'Video', audio:'Audio', doc:'Panduan' };
+
+/* Tautan "Paket Lengkap RPP" tiap bencana.
+   Paling praktis: buat satu FOLDER di Google Drive berisi
+   seluruh berkas bencana tersebut, bagikan foldernya
+   ("Siapa saja yang memiliki link"), lalu tempel tautannya
+   di bawah. Biarkan kosong bila belum tersedia. */
+const PACK_LINKS = {
+  banjir:  'https://drive.google.com/drive/folders/1Vj7TC9K_8jbtxpDsOD68e-Dkge77-kux?usp=drive_link',
+  longsor: 'https://drive.google.com/drive/folders/19d9W_t6NIAULKSAVzP33wdcNTV8rAdMy?usp=drive_link',
+  cuaca:   'https://drive.google.com/drive/folders/12-i_PxetSHJOGHRSRNHXBMFWMqRmAg_9?usp=drive_link',
+};
+
+const PARTNERS = [
+  { name:'BPBD', desc:'Koordinasi data risiko wilayah, jalur evakuasi, dan simulasi bersama sekolah.', emoji:'🏢' },
+  { name:'Basarnas', desc:'Pelatihan dasar pertolongan dan edukasi tanda siaga darurat untuk pendidik.', emoji:'🚨' },
+  { name:'Puskesmas', desc:'Edukasi kesehatan pascabencana dan dukungan psikososial anak.', emoji:'⛑️' },
+  { name:'Komunitas Siaga Gampong', desc:'Praktik gotong royong, pemantauan cuaca, dan jejaring orang tua.', emoji:'🤝' },
+];
+
+/* =========================================================
+   TIM PENGEMBANG
+   ---------------------------------------------------------
+   CARA MENGISI:
+   - name   : nama lengkap anggota tim
+   - role   : peran dalam pengembangan
+   - origin : asal instansi / daerah
+   - bio    : 1-2 kalimat singkat
+   - photo  : URL/berkas foto, mis. 'foto/andi.jpg'
+              Kosongkan ('') jika belum ada foto -> otomatis
+              tampil inisial nama berwarna.
+   - theme  : sky | leaf | sun | coral (warna kartu)
+   ========================================================= */
+const TEAM = [
+  { name:'Nama Anggota 1', role:'Ketua Tim / Pengembang Model', origin:'Bireuen, Aceh',
+    bio:'Merancang kerangka model pembelajaran dan memastikan materi sesuai tahap perkembangan anak usia dini.',
+    photo:'', theme:'sky' },
+  { name:'Nama Anggota 2', role:'Ahli Materi PAUD', origin:'Banda Aceh, Aceh',
+    bio:'Menyusun capaian pembelajaran, LKPD, dan kegiatan bermain yang aman untuk anak.',
+    photo:'', theme:'leaf' },
+  { name:'Nama Anggota 3', role:'Desainer Media & Ilustrasi', origin:'Lhokseumawe, Aceh',
+    bio:'Membuat kartu gambar, flipped book, serta ilustrasi maskot agar materi mudah dipahami anak.',
+    photo:'', theme:'sun' },
+  { name:'Nama Anggota 4', role:'Pengembang Web', origin:'Sigli, Aceh',
+    bio:'Membangun portal digital SIGAP BENCANA agar materi dapat diakses guru kapan saja.',
+    photo:'', theme:'coral' },
+];
+
+function initials(name){
+  return name.trim().split(/\s+/).filter(w=>/[A-Za-z]/.test(w)).slice(0,2)
+    .map(w=>w[0].toUpperCase()).join('') || '?';
+}
+
+/* =========================================================
+   STATE & ROUTER
+   ========================================================= */
+const state = { mode:'guru', disasterKey:null, view:'landing' };
+const root = document.getElementById('app');
+
+function go(view, extra={}){
+  Object.assign(state, extra, {view});
+  window.scrollTo({top:0, behavior:'instant' in window ? 'instant':'auto'});
+  render();
+}
+
+function themeColors(t){
+  return {
+    sky:  {bg:'bg-sky', bgLight:'bg-sky-light', text:'text-sky-ink', dark:'bg-sky-dark', border:'border-sky', ring:'ring-sky'},
+    leaf: {bg:'bg-leaf', bgLight:'bg-leaf-light', text:'text-leaf-ink', dark:'bg-leaf-dark', border:'border-leaf', ring:'ring-leaf'},
+    sun:  {bg:'bg-sun', bgLight:'bg-sun-light', text:'text-sun-ink', dark:'bg-sun-dark', border:'border-sun', ring:'ring-sun'},
+    coral:{bg:'bg-coral', bgLight:'bg-coral-light', text:'text-coral-ink', dark:'bg-coral-dark', border:'border-coral', ring:'ring-coral'},
+  }[t];
+}
+
+/* =========================================================
+   SHARED HEADER
+   ========================================================= */
+function headerHTML(){
+  const NAV_ITEMS = [
+    {view:'landing',   icon:'🏠', label:'Beranda'},
+    {view:'disasters', icon:'📘', label:'Materi Pembelajaran'},
+    {view:'partners',  icon:'🤝', label:'Kemitraan'},
+    {view:'about',     icon:'👥', label:'Tentang Kami'},
+  ];
+  const activeView = state.view==='disaster' ? 'disasters' : state.view;
+
+  const nav = NAV_ITEMS.map(item=>{
+    const isActive = item.view === activeView;
+    const cls = isActive
+      ? 'rounded-full bg-sky text-white font-700 px-5 py-2.5 shadow-sm hover:opacity-90 transition'
+      : 'rounded-full bg-white text-ink font-700 px-5 py-2.5 border border-ink/15 hover:border-sky hover:text-sky-dark transition';
+    return `<button data-nav="${item.view}" class="${cls}">${item.icon} ${item.label}</button>`;
+  }).join('');
+
+  return `
+  <div class="sticky top-0 z-30 bg-cream/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+      <header class="rounded-4xl bg-white shadow-sm border border-ink/10 px-4 sm:px-6 py-3">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3 shrink-0">
+            <div class="w-12 h-12 rounded-full border-2 border-sun bg-sun-light flex items-center justify-center text-2xl bob">🛟</div>
+            <div class="leading-none">
+              <span class="font-heading text-2xl sm:text-3xl font-800 text-ink leading-none">SIGAP BENCANA</span>
+              <span class="block text-xs text-inkfaint mt-1">Portal Belajar PAUD Siaga Bencana</span>
+            </div>
+          </div>
+          <nav class="flex flex-wrap items-center gap-2.5">${nav}</nav>
+        </div>
+      </header>
+    </div>
+  </div>`;
+}
+
+/* =========================================================
+   VIEW: LANDING
+   ========================================================= */
+function viewLanding(){
+  const cards = Object.entries(DATA).map(([key,d])=>{
+    const c = themeColors(d.theme);
+    return { key, emoji:d.emoji, title:d.name, subtitle:d.tagline, bgLight:c.bgLight, text:c.text, border:c.border };
+  });
+
+  return `
+  <section class="min-h-screen bg-cream">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+      <div class="relative max-w-3xl mx-auto pt-12 sm:pt-16 pb-10 text-center">
+        <div class="pointer-events-none select-none absolute inset-0 -z-0" aria-hidden="true">
+          <span class="hidden sm:block absolute left-0 top-10 text-4xl drift opacity-70">☁️</span>
+          <span class="hidden sm:block absolute right-2 top-6 text-3xl bob opacity-80">🌈</span>
+          <span class="hidden sm:block absolute right-10 bottom-4 text-2xl twinkle">⭐</span>
+          <span class="hidden sm:block absolute left-8 bottom-2 text-2xl twinkle" style="animation-delay:.8s">✨</span>
+        </div>
+
+        <div class="relative">
+          <div class="inline-flex items-center gap-2 rounded-full bg-leaf-light px-5 py-2.5 border border-leaf/30">
+            <span class="text-lg">💗</span>
+            <span class="font-700 text-leaf-ink text-sm">Tenang, kita hadapi ini bersama</span>
+          </div>
+
+          <h1 class="font-heading text-4xl sm:text-5xl font-800 text-ink mt-6 leading-tight">
+            Pilih kondisi yang sedang terjadi
+          </h1>
+
+          <svg class="squiggle mx-auto mt-1" width="240" height="14" viewBox="0 0 240 14" fill="none" aria-hidden="true">
+            <path d="M4 9c30-8 60 4 90-1s60-7 90 1 52 2 52 2" stroke="#FFC93C" stroke-width="5" stroke-linecap="round"/>
+          </svg>
+
+          <p class="mt-4 text-lg text-inkfaint max-w-xl mx-auto leading-relaxed">
+            Kami siapkan panduan pembelajaran sederhana untuk setiap jenis bencana, siap dipakai guru PAUD hari ini.
+          </p>
+        </div>
+      </div>
+
+      <div class="max-w-5xl mx-auto pb-16">
+        <div class="grid sm:grid-cols-3 gap-5">
+          ${cards.map(item => `
+            <button data-nav="disaster" data-key="${item.key}" class="group rounded-4xl bg-white border-2 border-ink/10 hover:${item.border} hover:shadow-lg p-6 text-left transition">
+              <div class="${item.bgLight} w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-4xl mb-5 group-hover:scale-105 transition">
+                <span class="wiggle-hover inline-block">${item.emoji}</span>
+              </div>
+              <div class="text-center">
+                <div class="font-heading text-xl font-700 text-ink">${item.title}</div>
+                <p class="mt-1.5 text-sm text-inkfaint">${item.subtitle}</p>
+                <span class="mt-3 inline-flex items-center gap-1 text-sm font-700 ${item.text}">Buka materi <span aria-hidden="true">›</span></span>
+              </div>
+            </button>
+          `).join('')}
+        </div>
+
+        <div class="mt-8 rounded-4xl bg-sun-light border-2 border-sun/40 px-5 sm:px-8 py-6 flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+          <div class="shrink-0 w-16 h-16 rounded-full bg-white border-2 border-sun flex items-center justify-center text-3xl bob">🐥</div>
+          <div>
+            <p class="font-heading text-lg font-700 text-sun-ink">Halo, aku Sigi si anak ayam!</p>
+            <p class="text-sm text-ink/70 mt-1 leading-relaxed">
+              Ayo belajar bersama: dengar aba-aba bu guru, pegang tangan teman, lalu jalan tenang ke titik kumpul. Bukan lari, ya!
+            </p>
+          </div>
+          <div class="shrink-0 flex gap-1.5 text-2xl" aria-hidden="true">
+            <span class="bob">🧒</span>
+            <span class="bob" style="animation-delay:.4s">👧</span>
+            <span class="bob" style="animation-delay:.8s">🧑‍🏫</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+
+/* =========================================================
+   VIEW: DISASTER SELECTION
+   ========================================================= */
+function viewDisasters(){
+  const isGuru = true;
+  const cards = Object.entries(DATA).map(([key,d])=>{
+    const c = themeColors(d.theme);
+    return `
+    <button data-nav="disaster" data-key="${key}"
+      class="group text-left rounded-4xl border-2 border-ink/10 bg-white hover:shadow-xl hover:${c.border} transition p-6 sm:p-7 fade-up">
+      <div class="w-14 h-14 rounded-2xl ${c.bgLight} flex items-center justify-center text-3xl mb-4 group-hover:scale-105 transition">${d.emoji}</div>
+      <h3 class="font-heading text-xl font-700 text-ink">${d.name}</h3>
+      <p class="mt-1.5 text-sm text-inkfaint">${d.tagline}</p>
+      <div class="mt-4 flex gap-1.5">
+        ${SYN_LABELS.map(()=> `<span class="w-2 h-2 rounded-full ${c.bg}"></span>`).join('')}
+      </div>
+      <span class="mt-4 inline-flex items-center gap-1 text-sm font-700 ${c.text}">Buka materi <span aria-hidden="true">›</span></span>
+    </button>`;
+  }).join('');
+
+  const guruExtra = `
+    <div class="mt-10 grid sm:grid-cols-2 gap-5">
+      <button data-nav="partners" class="text-left rounded-4xl bg-ink text-cream p-6 sm:p-7 hover:opacity-95 transition">
+        <div class="text-2xl mb-3">🤝</div>
+        <h3 class="font-heading text-lg font-700">Kemitraan Mitra Siaga</h3>
+        <p class="mt-1 text-sm text-cream/70">BPBD, Basarnas, Puskesmas, dan komunitas siaga gampong sebagai pendukung pembelajaran.</p>
+      </button>
+      <div class="rounded-4xl border-2 border-dashed border-ink/15 p-6 sm:p-7 flex flex-col justify-center">
+        <p class="text-sm text-inkfaint">💡 Setiap materi mengikuti alur pembelajaran 5 tahap: Mengenali Risiko → Kesiapsiagaan → Mitigasi → Respons → Pemulihan. RPP dan LKPD tersedia untuk diunduh pada setiap tahap.</p>
+      </div>
+    </div>`;
+
+  return `
+  <section class="max-w-6xl mx-auto px-6 py-10 sm:py-14">
+    <div class="mb-6">
+      <p class="text-sm font-700 text-sky-dark mb-2">Tema materi</p>
+      <h1 class="font-heading text-3xl sm:text-4xl font-800 text-ink">Siapkan materi pembelajaran hari ini</h1>
+    </div>
+    <div class="grid sm:grid-cols-3 gap-5">${cards}</div>
+    ${guruExtra}
+  </section>`;
+}
+
+/* =========================================================
+   VIEW: PARTNERS (Guru only)
+   ========================================================= */
+function viewPartners(){
+  return `
+  <section class="max-w-4xl mx-auto px-6 py-12">
+    <div class="mb-6">
+      <p class="text-sm font-700 text-sky-dark mb-2">Ruang Guru</p>
+      <h1 class="font-heading text-3xl sm:text-4xl font-800 text-ink mb-3">Panduan Kemitraan</h1>
+    </div>
+    <p class="text-inkfaint max-w-xl mb-8">Kolaborasi lintas lembaga membuat pembelajaran siaga bencana lebih nyata dan terhubung dengan kondisi wilayah.</p>
+    <div class="grid sm:grid-cols-2 gap-5">
+      ${PARTNERS.map(p=>`
+      <div class="rounded-4xl border-2 border-ink/10 bg-white p-6">
+        <div class="text-3xl mb-3">${p.emoji}</div>
+        <h3 class="font-heading text-lg font-700 text-ink">${p.name}</h3>
+        <p class="mt-1.5 text-sm text-inkfaint">${p.desc}</p>
+      </div>`).join('')}
+    </div>
+  </section>`;
+}
+
+/* =========================================================
+   VIEW: ABOUT / TIM PENGEMBANG
+   ========================================================= */
+function viewAbout(){
+  return `
+  <section class="max-w-5xl mx-auto px-6 py-12">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div>
+        <p class="text-sm font-700 text-coral-dark mb-2">Tentang Kami</p>
+        <h1 class="font-heading text-3xl sm:text-4xl font-800 text-ink mb-3">Tim Pengembang</h1>
+      </div>
+      <button data-nav="landing" class="text-sm font-700 px-4 py-2.5 rounded-full border border-ink/15 bg-white hover:border-sky hover:text-sky-dark transition">← Beranda</button>
+    </div>
+
+    <p class="text-inkfaint max-w-2xl mb-8 leading-relaxed">
+      SIGAP BENCANA disusun oleh tim yang menggabungkan pengalaman mengajar PAUD, kesiapsiagaan bencana,
+      dan pengembangan media belajar, agar guru punya bahan yang siap pakai di kelas.
+    </p>
+
+    <div class="grid sm:grid-cols-2 gap-5">
+      ${TEAM.map(m=>{
+        const c = themeColors(m.theme);
+        const avatar = m.photo
+          ? `<img src="${m.photo}" alt="Foto ${m.name}" loading="lazy"
+                  class="w-20 h-20 rounded-3xl object-cover border-2 ${c.border} shrink-0">`
+          : `<div class="w-20 h-20 rounded-3xl ${c.bgLight} border-2 ${c.border} shrink-0 flex items-center justify-center font-heading text-2xl font-800 ${c.text}"
+                  role="img" aria-label="Inisial ${m.name}">${initials(m.name)}</div>`;
+        return `
+        <article class="rounded-4xl border-2 border-ink/10 bg-white p-6 hover:shadow-lg transition">
+          <div class="flex items-start gap-4">
+            ${avatar}
+            <div class="min-w-0">
+              <h3 class="font-heading text-lg font-700 text-ink leading-snug">${m.name}</h3>
+              <p class="mt-1 inline-block rounded-full ${c.bgLight} ${c.text} text-xs font-700 px-3 py-1">${m.role}</p>
+              <p class="mt-2 text-sm text-inkfaint flex items-center gap-1.5">
+                <span aria-hidden="true">📍</span>${m.origin}
+              </p>
+            </div>
+          </div>
+          <p class="mt-4 text-sm text-ink/75 leading-relaxed">${m.bio}</p>
+        </article>`;
+      }).join('')}
+    </div>
+
+    <div class="mt-8 rounded-4xl bg-sun-light border-2 border-sun/40 px-6 py-5 flex items-start gap-4">
+      <span class="text-2xl shrink-0 bob" aria-hidden="true">🐥</span>
+      <p class="text-sm text-sun-ink leading-relaxed">
+        <span class="font-700">Catatan:</span> data anggota di atas masih berupa contoh.
+        Ubah nama, peran, asal, deskripsi, dan tautan foto pada bagian
+        <code class="bg-white/70 rounded px-1.5 py-0.5 font-700">TEAM</code> di dalam berkas ini.
+        Jika kolom foto dikosongkan, kartu otomatis menampilkan inisial nama.
+      </p>
+    </div>
+
+    <div class="mt-8 flex flex-wrap gap-3">
+      <button data-nav="disasters" class="text-sm font-700 px-4 py-2.5 rounded-full border border-ink/15 bg-white hover:border-sky hover:text-sky-dark transition">← Kembali ke materi</button>
+      <button data-nav="partners" class="text-sm font-700 px-4 py-2.5 rounded-full border border-ink/15 bg-white hover:border-coral hover:text-coral-dark transition">🤝 Kemitraan</button>
+    </div>
+  </section>`;
+}
+
+/* =========================================================
+   VIEW: DISASTER DETAIL (5 syntaxes)
+   ========================================================= */
+function renderFileCard(f, c, d){
+  const href = resolveURL(f.url, f.mode);
+  const action = f.mode === 'preview' ? '🔗 Buka' : '📥 Unduh';
+  const inner = `
+    <span class="text-xl">${FILE_ICON[f.type]}</span>
+    <span class="flex-1 min-w-0">
+      <span class="block text-sm font-700 text-ink truncate">${f.name}</span>
+      <span class="block text-[11px] text-inkfaint">${FILE_LABEL[f.type]}</span>
+    </span>
+    <span class="text-xs font-700 ${href ? c.text : 'text-inkfaint'}">${href ? action : '⏳ Segera'}</span>`;
+  const cls = "flex items-center gap-3 rounded-2xl border border-ink/10 hover:"+c.border+" bg-cream/60 hover:bg-white transition p-3.5 text-left w-full";
+  return href
+    ? `<a href="${href}" target="_blank" rel="noopener" class="${cls}">${inner}</a>`
+    : `<button data-download data-file="${f.name}" data-type="${f.type}" data-color="${d.theme}" class="${cls}">${inner}</button>`;
+}
+
+/* Kelompok berkas per tahap, meniru sub-folder MEDIA/ dan LKPD/
+   pada folder materi masing-masing bencana. */
+function renderFileGroup(label, icon, list, c, d){
+  if(!list || !list.length) return '';
+  return `
+  <div>
+    <p class="text-xs font-800 uppercase tracking-wide ${c.text} mb-2 flex items-center gap-1.5">
+      <span>${icon}</span>${label}
+    </p>
+    <div class="grid sm:grid-cols-2 gap-3">
+      ${list.map(f=>renderFileCard(f, c, d)).join('')}
+    </div>
+  </div>`;
+}
+
+function viewDisaster(){
+  const d = DATA[state.disasterKey];
+  const c = themeColors(d.theme);
+
+  const intro = `
+  <div class="max-w-6xl mx-auto px-6 pt-10 pb-4">
+    <div class="flex items-center gap-4">
+      <div class="w-16 h-16 rounded-3xl ${c.bgLight} flex items-center justify-center text-3xl">${d.emoji}</div>
+      <div>
+        <p class="text-sm font-700 ${c.text}">Materi</p>
+        <h1 class="font-heading text-3xl sm:text-4xl font-800 text-ink">${d.name}</h1>
+      </div>
+    </div>
+    <p class="mt-3 text-inkfaint max-w-xl">${d.tagline}</p>
+  </div>`;
+
+  const items = d.syntaxes.map((s,i)=>`
+    <div class="rounded-3xl border-2 border-ink/10 bg-white overflow-hidden">
+      <button class="w-full flex items-center gap-4 text-left p-5 sm:p-6" data-accordion="${i}">
+        <span class="shrink-0 w-9 h-9 rounded-full ${c.bg} text-white font-heading font-700 flex items-center justify-center">${i+1}</span>
+        <span class="flex-1 min-w-0">
+          <span class="block font-heading font-700 text-ink">${SYN_LABELS[i].id}</span>
+          <span class="block text-xs text-inkfaint uppercase tracking-wide">${SYN_LABELS[i].en}</span>
+        </span>
+        <span class="text-inkfaint acc-caret transition-transform">⌄</span>
+      </button>
+      <div class="acc-panel hidden px-5 sm:px-6 pb-6 space-y-5">
+        <p class="text-sm text-inkfaint max-w-xl">${s.tujuan}</p>
+        ${renderFileGroup('Materi', '📚', s.materi, c, d)}
+        ${renderFileGroup('LKPD', '📝', s.lkpd, c, d)}
+      </div>
+    </div>`).join('');
+
+  return intro + `
+  <section class="max-w-6xl mx-auto px-6 pb-16">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+      <div class="flex flex-wrap items-center gap-3">
+        <button data-nav="disasters" class="text-sm font-700 px-4 py-2.5 rounded-full border border-ink/15 bg-white hover:border-sky hover:text-sky-dark transition">← Kembali ke materi</button>
+        <button data-nav="landing" class="text-sm font-700 px-4 py-2.5 rounded-full border border-ink/15 bg-white hover:border-sky hover:text-sky-dark transition">← Beranda</button>
+      </div>
+      ${(()=>{
+        const packHref = resolveURL(PACK_LINKS[state.disasterKey], 'preview');
+        const packCls = `text-sm font-700 px-4 py-2.5 rounded-full ${c.bg} text-white hover:opacity-90 transition`;
+        return packHref
+          ? `<a href="${packHref}" target="_blank" rel="noopener" class="${packCls}">📦 Buka Paket Lengkap RPP</a>`
+          : `<button data-download data-file="Paket Lengkap RPP &amp; Modul ${d.name}" data-type="doc" data-color="${d.theme}" class="${packCls}">📦 Unduh Paket Lengkap RPP</button>`;
+      })()}
+    </div>
+    <div class="space-y-3">${items}</div>
+  </section>`;
+}
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+function render(){
+  document.body.className = 'antialiased mode-guru';
+
+  let content = '';
+  if(state.view==='landing') content = viewLanding();
+  else if(state.view==='disasters') content = viewDisasters();
+  else if(state.view==='partners') content = viewPartners();
+  else if(state.view==='about') content = viewAbout();
+  else if(state.view==='disaster') content = viewDisaster();
+
+  root.innerHTML = headerHTML() + `<div class="fade-up">${content}</div>` + footerHTML();
+  bindEvents();
+}
+
+function footerHTML(){
+  if(state.view==='landing') return `
+  <footer class="max-w-6xl mx-auto px-6 pb-10 text-center text-xs text-inkfaint">
+    SIGAP BENCANA — Model Pembelajaran Mitigasi &amp; Kesiapsiagaan Bencana untuk PAUD
+  </footer>`;
+  return `
+  <footer class="max-w-6xl mx-auto px-6 py-10 text-center text-xs text-inkfaint">
+    🛟 SIGAP BENCANA · untuk guru PAUD dan mitra siaga
+    <span class="opacity-40 mx-1.5">·</span>
+    <button data-nav="about" class="font-700 hover:text-ink hover:underline">Tim Pengembang</button>
+  </footer>`;
+}
+
+/* =========================================================
+   EVENTS
+   ========================================================= */
+function bindEvents(){
+  root.querySelectorAll('[data-nav]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const nav = el.getAttribute('data-nav');
+      if(nav==='pick-mode'){ go('disasters', {mode:'guru'}); }
+      else if(nav==='landing'){ go('landing', {mode:'guru', disasterKey:null}); }
+      else if(nav==='disasters'){ go('disasters', {mode:'guru'}); }
+      else if(nav==='partners'){ go('partners', {mode:'guru'}); }
+      else if(nav==='about'){ go('about', {mode:'guru', disasterKey:null}); }
+      else if(nav==='disaster'){ go('disaster', {mode:'guru', disasterKey:el.getAttribute('data-key')}); }
+    });
+  });
+
+  root.querySelectorAll('[data-accordion]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const panel = btn.parentElement.querySelector('.acc-panel');
+      const caret = btn.querySelector('.acc-caret');
+      const isHidden = panel.classList.contains('hidden');
+      panel.classList.toggle('hidden');
+      caret.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+    });
+  });
+
+  root.querySelectorAll('[data-download]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      openDownloadModal(btn.getAttribute('data-file'), btn.getAttribute('data-type'), btn.getAttribute('data-color'));
+    });
+  });
+}
+
+/* =========================================================
+   DOWNLOAD MODAL (simulasi)
+   ========================================================= */
+function openDownloadModal(filename, type, colorKey){
+  const c = themeColors(colorKey || 'sky');
+  const tpl = document.getElementById('tpl-download-modal').content.cloneNode(true);
+  const panel = tpl.querySelector('[data-modal-panel]');
+  panel.innerHTML = `
+    <div class="flex items-start gap-4">
+      <span class="w-14 h-14 rounded-2xl ${c.bgLight} flex items-center justify-center text-2xl shrink-0">${FILE_ICON[type]||'📄'}</span>
+      <div class="min-w-0">
+        <p class="text-xs font-700 ${c.text} uppercase tracking-wide">${FILE_LABEL[type]||'Berkas'}</p>
+        <h3 class="font-heading text-lg font-700 text-ink leading-snug">${filename}</h3>
+      </div>
+    </div>
+    <div class="mt-5 rounded-2xl bg-sun-light border border-sun/40 p-4">
+      <p class="text-sm font-700 text-sun-ink">Berkas belum dihubungkan</p>
+      <p class="mt-1.5 text-sm text-ink/75 leading-relaxed">
+        Tautan Google Drive untuk berkas ini belum diisi. Unggah berkas ke Drive,
+        atur izin berbagi ke <span class="font-700">"Siapa saja yang memiliki link"</span>,
+        lalu tempel tautannya pada berkas ini.
+      </p>
+    </div>
+    <button data-modal-close class="mt-6 w-full rounded-full py-3 font-700 text-white ${c.bg} hover:opacity-90 transition">Tutup</button>
+  `;
+  document.body.appendChild(tpl);
+  const rootEl = document.body.lastElementChild;
+
+  function closeModal(){ rootEl.remove(); }
+  rootEl.querySelector('[data-modal-backdrop]').addEventListener('click', closeModal);
+  rootEl.querySelector('[data-modal-close]').addEventListener('click', closeModal);
+  document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ closeModal(); document.removeEventListener('keydown', esc); } });
+}
+
+render();
+</script>
+</body>
+</html>
